@@ -5,6 +5,7 @@ ENV APACHE_DOCUMENT_ROOT=/var/www/html/public
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         libzip-dev \
+        libxml2-dev \
         unzip \
         git \
         libonig-dev \
