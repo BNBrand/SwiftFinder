@@ -8,6 +8,7 @@ RUN apt-get update \
         unzip \
         git \
         libonig-dev \
+        pkg-config \
     && docker-php-ext-install \
         pdo_mysql \
         mbstring \
