@@ -1,0 +1,11 @@
+<?php
+namespace App\Http\Controllers\Api;
+use App\Http\Controllers\Controller; use App\Models\Conversation; use App\Models\Item; use Illuminate\Http\Request; use App\Notifications\SwiftFinderNotification;
+class ConversationController extends Controller {
+ public function index(Request $r){$u=$r->user();$rows=Conversation::with(['item:id,title','starter:id,name,photo_path','recipient:id,name,photo_path','messages'=>fn($q)=>$q->latest()->limit(1)])->where(fn($q)=>$q->where('starter_id',$u->id)->orWhere('recipient_id',$u->id))->latest()->get();return $this->ok($rows,'Conversations retrieved.');}
+ public function start(Request $r,Item $item){abort_if($item->user_id===$r->user()->id,422,'You cannot contact yourself.');$conversation=Conversation::firstOrCreate(['item_id'=>$item->id,'starter_id'=>$r->user()->id,'recipient_id'=>$item->user_id]);return $this->ok($conversation,'Conversation ready.',201);}
+ public function messages(Request $r,Conversation $conversation){$this->member($r,$conversation);$conversation->messages()->whereNull('read_at')->where('sender_id','!=',$r->user()->id)->update(['read_at'=>now()]);return $this->ok($conversation->messages()->with('sender:id,name,photo_path')->oldest()->get(),'Messages retrieved.');}
+ public function send(Request $r,Conversation $conversation){$this->member($r,$conversation);$data=$r->validate(['body'=>'required|string|max:4000']);$message=$conversation->messages()->create($data+['sender_id'=>$r->user()->id]);$recipient=$conversation->starter_id===$r->user()->id?$conversation->recipient:$conversation->starter;$recipient->notify(new SwiftFinderNotification('message_received','New message',$r->user()->name.' sent you a message.',['conversation_id'=>$conversation->id,'item_id'=>$conversation->item_id]));return $this->ok($message,'Message sent.',201);}
+ public function destroyMessage(Request $r,Conversation $conversation,$message){$this->member($r,$conversation);$m=$conversation->messages()->findOrFail($message);abort_unless($m->sender_id===$r->user()->id,403);$m->delete();return $this->ok(null,'Message deleted.');}
+ private function member(Request $r,Conversation $c){abort_unless(in_array($r->user()->id,[$c->starter_id,$c->recipient_id]),403);} private function ok($data,string $message,int $status=200){return response()->json(['success'=>true,'message'=>$message,'data'=>$data],$status);}
+}
